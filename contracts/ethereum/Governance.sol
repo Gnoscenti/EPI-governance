@@ -1,301 +1,605 @@
-Implementing the MicroAi Governance Framework: A Prototypical Architecture for Ethical AI Autonomy
-Abstract
-This document presents a concrete implementation blueprint for the MicroAi Governance Framework, as articulated in the MicroAi Studios Master Company Blueprint (December 2025). Drawing from the principles of mathematically entangled ethics and profitability, we operationalize the Ethical Profitability Index (EPI) as a core constraint mechanism, integrated into a modular governance stack. The framework is designed as a deployable monorepo, leveraging Python for off-chain computation (EPI evaluation and AI intent simulation), Solidity for on-chain enforcement (via Ethereum-compatible contracts), and a hybrid Solana/Ethereum substrate simulation using Anchor for Solana proposals.
-Our approach treats governance as an engineering discipline, aligning with recent scholarly advancements in AI alignment and verifiable computation. For instance, the EPI’s harmonic-mean formulation echoes the robustness guarantees in multi-objective optimization literature (e.g., Boyd & Vandenberghe, 2004, Convex Optimization), while its trust accumulator draws from geometric decay models in reputation systems (e.g., Jøsang et al., 2007, A Survey of Trust and Reputation Systems for Online Service Provision). We reference these in code annotations for reproducibility and extension.
-The repository structure is deployment-ready: clone, install dependencies, and deploy via scripts for local testing, testnet rollout, or production (e.g., Vercel for SaaS overlay, Alchemy for blockchain). This prototype focuses on Tier 1 (MicroAi Lite) for accessibility, with hooks for Tier 2/3 scaling. Ethical deployment is prioritized: all decisions log EPI traces for auditability, fostering “synthetic trust” as a certifiable standard.
-Introduction
-The MicroAi blueprint envisions AI not as an opaque oracle but as a co-governor, bound by executable ethics. Central to this is the EPI, which enforces a “no trade-offs” philosophy: decisions must balance profit (quantified via ROI proxies) and ethics (via multi-dimensional scoring, e.g., environmental impact, equity). The framework decomposes into layers—Mathematical Constitution (EPI), AI C-Suite (simulated intents), Policy Engine (deterministic checks), and Chain Substrate (hybrid blockchain)—mirroring the blueprint’s architecture.
-This implementation provides:
-	•	EPI Core: A Python module for computation, with unit tests.
-	•	Policy Engine: Off-chain validator integrating EPI.
-	•	On-Chain Enforcement: Solidity contracts for proposal submission and EPI-gated execution.
-	•	Deployment Pipeline: Scripts for local dev, testnet deploys, and SaaS hosting.
-Extensions to full AI C-Suite (e.g., fine-tuned LLMs) are stubbed for integration with libraries like Hugging Face Transformers. For production, we recommend adversarial testing per OWASP AI guidelines (2023).
-Repository Structure
-The GitHub repository, microai-governance-framework, is structured as a monorepo for simplicity and scalability. It uses Poetry for Python dependencies, Hardhat for Ethereum contracts, and Anchor for Solana (via Rust). A deploy.sh script orchestrates full deployment.
-microai-governance-framework/
-├── README.md                  # Deployment guide, architecture overview, and contribution guidelines
-├── .gitignore                 # Standard ignores (e.g., __pycache__, node_modules)
-├── deploy.sh                  # Bash script: local setup, testnet deploy, SaaS build
-├── requirements.txt           # Fallback for pip (generated from Poetry)
-├── pyproject.toml             # Poetry config for Python deps
-├── package.json               # NPM for JS utils (e.g., ethers.js bridging)
-├── contracts/                 # Solidity + Rust for chain substrate
-│   ├── ethereum/
-│   │   ├── Governance.sol     # EPI-enforced proposal contract (Ethereum anchor)
-│   │   ├── EPIOracle.sol      # Off-chain EPI feed (Chainlink-compatible)
-│   │   ├── hardhat.config.js  # Config for compilation/testing
-│   │   └── scripts/
-│   │       └── deploy.js      # Deploy script for Ethereum
-│   └── solana/
-│       ├── programs/
-│       │   └── governance/
-│       │       ├── Cargo.toml # Rust deps for Anchor
-│       │       └── src/
-│       │           └── lib.rs # Solana program: high-throughput proposals + thought logging
-│       └── Anchor.toml        # Anchor config
-├── src/                       # Python core: EPI, Policy Engine, stubs
-│   ├── epi/
-│   │   ├── __init__.py
-│   │   ├── calculator.py      # EPI computation logic
-│   │   ├── trust_accumulator.py # Geometric trust decay
-│   │   └── tests/
-│   │       └── test_epi.py    # Pytest suite
-│   ├── policy_engine/
-│   │   ├── __init__.py
-│   │   ├── validator.py       # Intent checks: compliance, risk, EPI
-│   │   └── logger.py          # Thought logging (JSON + IPFS stub)
-│   └── ai_c_suite/
-│       ├── __init__.py
-│       ├── ceo_ai_stub.py     # Simulated CEO intent generator
-│       └── cfo_ai_stub.py     # Simulated CFO financial intents
-├── examples/                  # Usage demos
-│   ├── execai_demo.py         # Sample ExecAI workflow
-│   └── ret_tokenization.py    # RET dApp simulation
-├── docs/                      # Scholarly extensions
-│   ├── EPI_derivation.pdf     # Math appendix (LaTeX-generated)
-│   └── synthetic_trust.md     # Certification pathway
-└── .github/workflows/         # CI/CD
-    └── ci.yml                 # Lint, test, deploy on push
-Key Design Choices:
-	•	Modularity: EPI is isolated for reuse (e.g., in other DAOs).
-	•	Auditability: All modules emit traceable logs (e.g., via logging + on-chain events).
-	•	Scalability: Tier 1 uses cloud APIs; hooks for on-prem GPUs (e.g., via Ray for distributed inference).
-	•	Dependencies: Minimal—NumPy/SciPy for math, Web3.py/ethers.js for chains, Pytest for validation. No external installs beyond pip install -r requirements.txt.
-Core Implementation: Ethical Profitability Index (EPI)
-The EPI is the “mathematical constitution,” defined as:
-[ EPI = H(P, E) \cdot (1 - \phi \cdot |P - E|) \cdot T ]
-Where:
-	•	( H(P, E) = \frac{2PE}{P + E} ) (harmonic mean of Profit ( P \in [0,1] ) and Ethics ( E \in [0,1] )), collapsing to 0 if either nears 0.
-	•	( \phi = \frac{\sqrt{5} - 1}{2} \approx 0.618 ) (Golden Ratio conjugate) penalizes imbalance.
-	•	( T = \prod_{i=1}^n (1 - \delta_i) ) (geometric trust accumulator, where ( \delta_i ) are violation penalties, compounding multiplicatively).
-This formulation ensures rejective robustness: EPI < threshold (e.g., 0.7) blocks execution. See src/epi/calculator.py below for code.
-Code: EPI Calculator (`src/epi/calculator.py`)
-"""
-EPI Calculator: Harmonic-mean-based ethical constraint.
-References:
-- Harmonic mean robustness: Boyd & Vandenberghe (2004), Convex Optimization, Ch. 2.
-- Geometric decay: Jøsang et al. (2007), Decision Support Systems, 43(2).
-"""
-
-import numpy as np
-from typing import Tuple, List
-from dataclasses import dataclass
-
-@dataclass
-class EPIScores:
-    """Input scores for EPI computation."""
-    profit: float  # Normalized ROI proxy [0,1]
-    ethics: float  # Multi-dim ethics score [0,1] (e.g., env/equity/fairness avg)
-    violations: List[float]  # Per-incident penalties [0,1]
-
-PHI = (np.sqrt(5) - 1) / 2  # Golden Ratio conjugate ~0.618
-
-class EPICalculator:
-    @staticmethod
-    def harmonic_mean(p: float, e: float) -> float:
-        """Harmonic mean: collapses to 0 if p or e -> 0."""
-        if p == 0 or e == 0:
-            return 0.0
-        return 2 * p * e / (p + e)
-
-    @staticmethod
-    def balance_penalty(p: float, e: float) -> float:
-        """Golden-ratio penalty for imbalance."""
-        imbalance = abs(p - e)
-        return 1 - PHI * imbalance
-
-    @staticmethod
-    def trust_accumulator(violations: List[float], initial_trust: float = 1.0) -> float:
-        """Geometric product: multiplicative decay on violations."""
-        trust = initial_trust
-        for delta in violations:
-            trust *= (1 - delta)
-            if trust < 1e-6:  # Numerical stability
-                trust = 0.0
-        return trust
-
-    def compute_epi(self, scores: EPIScores, threshold: float = 0.7) -> Tuple[float, bool, dict]:
-        """
-        Compute EPI and validate.
-        Returns: (epi_value, is_valid, trace)
-        Trace: {'hmean': ..., 'penalty': ..., 'trust': ..., 'reason': ...}
-        """
-        hmean = self.harmonic_mean(scores.profit, scores.ethics)
-        penalty = self.balance_penalty(scores.profit, scores.ethics)
-        trust = self.trust_accumulator(scores.violations)
-        
-        epi = hmean * penalty * trust
-        
-        trace = {
-            'hmean': hmean,
-            'balance_penalty': penalty,
-            'trust': trust,
-            'epi': epi,
-            'reason': 'rejected' if epi < threshold else 'approved'
-        }
-        
-        is_valid = epi >= threshold
-        return epi, is_valid, trace
-
-# Example usage
-if __name__ == "__main__":
-    calc = EPICalculator()
-    scores = EPIScores(profit=0.9, ethics=0.6, violations=[0.1])  # Mild violation
-    epi, valid, trace = calc.compute_epi(scores)
-    print(f"EPI: {epi:.3f}, Valid: {valid}, Trace: {trace}")
-    # Output: EPI: 0.423, Valid: False, Trace: {...}
-Unit Tests (src/epi/tests/test_epi.py): Uses Pytest to verify edge cases (e.g., collapse on zero ethics, trust decay).
-import pytest
-from src.epi.calculator import EPICalculator, EPIScores
-
-@pytest.fixture
-def calc():
-    return EPICalculator()
-
-def test_harmonic_mean_collapse(calc):
-    assert calc.harmonic_mean(1.0, 0.0) == 0.0
-    assert calc.harmonic_mean(0.5, 0.5) == 0.5
-
-def test_trust_accumulator(calc):
-    assert calc.trust_accumulator([0.5]) == 0.5
-    assert calc.trust_accumulator([0.5, 0.5]) == 0.25  # Multiplicative
-
-def test_full_epi_rejection(calc):
-    scores = EPIScores(profit=1.0, ethics=0.1, violations=[])
-    epi, valid, _ = calc.compute_epi(scores)
-    assert not valid and epi < 0.7
-Policy Engine Integration
-The Policy Engine (src/policy_engine/validator.py) wraps EPI with compliance/risk checks, simulating deterministic compilation from AI intents to transactions.
-"""
-Policy Engine: Intent -> Tx validation.
-Integrates EPI, compliance (stubbed), risk (e.g., VaR proxy).
-"""
-
-from src.epi.calculator import EPICalculator, EPIScores
-from typing import Dict, Any
-
-class PolicyValidator:
-    def __init__(self):
-        self.epi_calc = EPICalculator()
-    
-    def validate_intent(self, intent: Dict[str, Any]) -> Dict[str, Any]:
-        """Validate AI-generated intent (e.g., {'action': 'invest', 'amount': 1000, 'ethics_factors': {...}})."""
-        # Stub compliance (e.g., sanctions check)
-        if 'sanctioned' in intent:
-            return {'approved': False, 'reason': 'Compliance fail'}
-        
-        # Risk check (simple concentration proxy)
-        risk_score = 1.0 - min(intent.get('exposure_ratio', 0), 1.0)
-        
-        # Ethics from factors (e.g., env=0.8, equity=0.7 -> avg=0.75)
-        ethics = np.mean(list(intent.get('ethics_factors', {}).values()))
-        profit = intent.get('roi_proxy', 0.0)  # Normalize [0,1]
-        violations = intent.get('past_violations', [])
-        
-        scores = EPIScores(profit=profit, ethics=ethics, violations=violations)
-        epi, epi_valid, epi_trace = self.epi_calc.compute_epi(scores)
-        
-        approved = epi_valid and risk_score > 0.5
-        return {
-            'approved': approved,
-            'epi_trace': epi_trace,
-            'risk_score': risk_score,
-            'reason': 'EPI rejection' if not epi_valid else 'Risk exceed' if risk_score <= 0.5 else 'Approved'
-        }
-
-# Example
-if __name__ == "__main__":
-    validator = PolicyValidator()
-    intent = {'action': 'proposal', 'roi_proxy': 0.85, 'ethics_factors': {'env': 0.9, 'equity': 0.7}, 'violations': []}
-    result = validator.validate_intent(intent)
-    print(result)  # {'approved': True, ...}
-On-Chain Substrate: Ethereum Contract Example
-For enforcement, contracts/ethereum/Governance.sol gates proposals with an EPI oracle (off-chain computation pushed via Chainlink).
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
-import "@chainlink/contracts/src/v0.8/interfaces/AggregatorV3Interface.sol";  // EPI as price feed proxy
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/utils/Pausable.sol";
+import "@chainlink/contracts/src/v0.8/interfaces/AggregatorV3Interface.sol";
 
-contract MicroAiGovernance is Ownable {
-    AggregatorV3Interface public epiOracle;  // Off-chain EPI feed
-    uint256 public epiThreshold = 700000;  // 0.7 * 1e6 for decimals
-    
-    event ProposalSubmitted(uint256 id, address proposer, bool approved, uint256 epiScore);
-    
+/**
+ * @title MicroAiGovernance
+ * @author MicroAI Studios
+ * @notice EPI-enforced governance contract for autonomous AI decision validation
+ * @dev Implements the Ethical Profitability Index (EPI) constraint mechanism
+ *      with Chainlink oracle integration for off-chain EPI computation
+ */
+contract MicroAiGovernance is Ownable, ReentrancyGuard, Pausable {
+    // ============ Constants ============
+
+    /// @notice EPI scaling factor (6 decimals for precision)
+    uint256 public constant EPI_DECIMALS = 1e6;
+
+    /// @notice Minimum voting period in blocks (~1 day at 12s blocks)
+    uint256 public constant MIN_VOTING_PERIOD = 7200;
+
+    /// @notice Maximum voting period in blocks (~7 days)
+    uint256 public constant MAX_VOTING_PERIOD = 50400;
+
+    // ============ State Variables ============
+
+    /// @notice Chainlink-compatible EPI oracle
+    AggregatorV3Interface public epiOracle;
+
+    /// @notice Minimum EPI score required for proposal submission (scaled by 1e6)
+    uint256 public epiThreshold;
+
+    /// @notice Voting period duration in blocks
+    uint256 public votingPeriod;
+
+    /// @notice Quorum required for proposal execution (as percentage, scaled by 1e4)
+    uint256 public quorumPercentage;
+
+    /// @notice Total proposals created
+    uint256 public proposalCount;
+
+    /// @notice Total voting power in the system
+    uint256 public totalVotingPower;
+
+    // ============ Structs ============
+
+    /// @notice Proposal status enum
+    enum ProposalStatus {
+        Pending,    // Awaiting voting
+        Active,     // Voting in progress
+        Defeated,   // Failed to reach quorum or majority
+        Succeeded,  // Passed vote
+        Executed,   // Successfully executed
+        Vetoed,     // Vetoed by guardian
+        Cancelled   // Cancelled by proposer
+    }
+
+    /// @notice Proposal data structure
     struct Proposal {
+        uint256 id;
         address proposer;
-        uint256 epiScore;
-        bool executed;
+        string title;
+        string description;
+        bytes32 ipfsHash;           // IPFS hash for detailed proposal data
+        uint256 epiScore;           // EPI score at submission (scaled by 1e6)
+        uint256 profitScore;        // Profit component (scaled by 1e6)
+        uint256 ethicsScore;        // Ethics component (scaled by 1e6)
+        uint256 forVotes;           // Votes in favor
+        uint256 againstVotes;       // Votes against
+        uint256 abstainVotes;       // Abstention votes
+        uint256 startBlock;         // Voting start block
+        uint256 endBlock;           // Voting end block
+        ProposalStatus status;
+        bytes32 thoughtHash;        // Hash of AI reasoning (for audit trail)
+        uint256 createdAt;
+        uint256 executedAt;
     }
-    
+
+    /// @notice Vote receipt structure
+    struct VoteReceipt {
+        bool hasVoted;
+        uint8 support;      // 0 = Against, 1 = For, 2 = Abstain
+        uint256 votes;
+    }
+
+    /// @notice Guardian structure for Class A stakeholders
+    struct Guardian {
+        bool isActive;
+        uint256 vetoCount;
+        uint256 addedAt;
+    }
+
+    // ============ Mappings ============
+
+    /// @notice Proposal ID => Proposal data
     mapping(uint256 => Proposal) public proposals;
-    uint256 public nextId = 1;
-    
+
+    /// @notice Proposal ID => Voter => Vote receipt
+    mapping(uint256 => mapping(address => VoteReceipt)) public voteReceipts;
+
+    /// @notice Address => Voting power
+    mapping(address => uint256) public votingPower;
+
+    /// @notice Address => Guardian status
+    mapping(address => Guardian) public guardians;
+
+    /// @notice Proposal ID => Execution hash (for reentrancy protection)
+    mapping(uint256 => bool) public proposalExecuted;
+
+    // ============ Events ============
+
+    event ProposalCreated(
+        uint256 indexed proposalId,
+        address indexed proposer,
+        string title,
+        uint256 epiScore,
+        uint256 startBlock,
+        uint256 endBlock
+    );
+
+    event VoteCast(
+        address indexed voter,
+        uint256 indexed proposalId,
+        uint8 support,
+        uint256 votes,
+        string reason
+    );
+
+    event ProposalExecuted(
+        uint256 indexed proposalId,
+        address indexed executor,
+        uint256 timestamp
+    );
+
+    event ProposalVetoed(
+        uint256 indexed proposalId,
+        address indexed guardian,
+        string reason
+    );
+
+    event ProposalCancelled(
+        uint256 indexed proposalId,
+        address indexed proposer
+    );
+
+    event EPIThresholdUpdated(
+        uint256 oldThreshold,
+        uint256 newThreshold
+    );
+
+    event GuardianAdded(address indexed guardian);
+    event GuardianRemoved(address indexed guardian);
+    event VotingPowerUpdated(address indexed account, uint256 oldPower, uint256 newPower);
+    event OracleUpdated(address indexed oldOracle, address indexed newOracle);
+
+    event ThoughtLogged(
+        uint256 indexed proposalId,
+        bytes32 thoughtHash,
+        string agentId,
+        uint256 timestamp
+    );
+
+    // ============ Errors ============
+
+    error EPIBelowThreshold(uint256 provided, uint256 required);
+    error ProposalNotActive(uint256 proposalId, ProposalStatus status);
+    error VotingNotStarted(uint256 proposalId, uint256 startBlock);
+    error VotingEnded(uint256 proposalId, uint256 endBlock);
+    error AlreadyVoted(address voter, uint256 proposalId);
+    error NoVotingPower(address voter);
+    error ProposalNotSucceeded(uint256 proposalId);
+    error AlreadyExecuted(uint256 proposalId);
+    error NotGuardian(address account);
+    error NotProposer(address account);
+    error InvalidVoteType(uint8 support);
+    error InvalidEPIScore(uint256 score);
+    error ZeroAddress();
+    error InvalidVotingPeriod(uint256 period);
+
+    // ============ Modifiers ============
+
+    modifier onlyGuardian() {
+        if (!guardians[msg.sender].isActive) revert NotGuardian(msg.sender);
+        _;
+    }
+
+    modifier validProposal(uint256 proposalId) {
+        require(proposalId > 0 && proposalId <= proposalCount, "Invalid proposal ID");
+        _;
+    }
+
+    // ============ Constructor ============
+
+    /**
+     * @notice Initialize the governance contract
+     * @param _epiOracle Address of the EPI oracle contract
+     */
     constructor(address _epiOracle) Ownable(msg.sender) {
+        if (_epiOracle == address(0)) revert ZeroAddress();
+
         epiOracle = AggregatorV3Interface(_epiOracle);
+        epiThreshold = 700000;  // 0.7 * 1e6
+        votingPeriod = 14400;   // ~2 days at 12s blocks
+        quorumPercentage = 400; // 4% quorum (scaled by 1e4)
+
+        // Add deployer as initial guardian
+        guardians[msg.sender] = Guardian({
+            isActive: true,
+            vetoCount: 0,
+            addedAt: block.timestamp
+        });
+
+        emit GuardianAdded(msg.sender);
     }
-    
-    function submitProposal(uint256 _externalEpiScore) external returns (uint256) {
-        (, int256 epiRaw,,,) = epiOracle.latestRoundData();  // Fetch EPI
-        uint256 epiScore = uint256(epiRaw);  // Assume 1e6 scale
-        
-        require(epiScore >= epiThreshold, "EPI below threshold");
-        
-        uint256 id = nextId++;
-        proposals[id] = Proposal(msg.sender, epiScore, false);
-        emit ProposalSubmitted(id, msg.sender, true, epiScore);
-        return id;
+
+    // ============ External Functions ============
+
+    /**
+     * @notice Submit a new proposal with EPI validation
+     * @param title Proposal title
+     * @param description Proposal description
+     * @param ipfsHash IPFS hash for detailed proposal data
+     * @param profitScore Profit component score (scaled by 1e6)
+     * @param ethicsScore Ethics component score (scaled by 1e6)
+     * @param thoughtHash Hash of AI reasoning for audit trail
+     * @return proposalId The ID of the created proposal
+     */
+    function submitProposal(
+        string calldata title,
+        string calldata description,
+        bytes32 ipfsHash,
+        uint256 profitScore,
+        uint256 ethicsScore,
+        bytes32 thoughtHash
+    ) external whenNotPaused returns (uint256 proposalId) {
+        // Validate scores
+        if (profitScore > EPI_DECIMALS || ethicsScore > EPI_DECIMALS) {
+            revert InvalidEPIScore(profitScore > ethicsScore ? profitScore : ethicsScore);
+        }
+
+        // Fetch current EPI from oracle
+        (, int256 epiRaw,,,) = epiOracle.latestRoundData();
+        uint256 epiScore = uint256(epiRaw);
+
+        // Validate EPI threshold
+        if (epiScore < epiThreshold) {
+            revert EPIBelowThreshold(epiScore, epiThreshold);
+        }
+
+        // Create proposal
+        proposalCount++;
+        proposalId = proposalCount;
+
+        uint256 startBlock = block.number + 1;
+        uint256 endBlock = startBlock + votingPeriod;
+
+        proposals[proposalId] = Proposal({
+            id: proposalId,
+            proposer: msg.sender,
+            title: title,
+            description: description,
+            ipfsHash: ipfsHash,
+            epiScore: epiScore,
+            profitScore: profitScore,
+            ethicsScore: ethicsScore,
+            forVotes: 0,
+            againstVotes: 0,
+            abstainVotes: 0,
+            startBlock: startBlock,
+            endBlock: endBlock,
+            status: ProposalStatus.Active,
+            thoughtHash: thoughtHash,
+            createdAt: block.timestamp,
+            executedAt: 0
+        });
+
+        emit ProposalCreated(
+            proposalId,
+            msg.sender,
+            title,
+            epiScore,
+            startBlock,
+            endBlock
+        );
+
+        emit ThoughtLogged(proposalId, thoughtHash, "PROPOSER", block.timestamp);
+
+        return proposalId;
     }
-    
-    // Guardian veto (Class A)
-    function vetoProposal(uint256 _id) external onlyOwner {
-        proposals[_id].executed = false;
+
+    /**
+     * @notice Cast a vote on a proposal
+     * @param proposalId The ID of the proposal
+     * @param support Vote type: 0 = Against, 1 = For, 2 = Abstain
+     * @param reason Optional reason for the vote
+     */
+    function castVote(
+        uint256 proposalId,
+        uint8 support,
+        string calldata reason
+    ) external validProposal(proposalId) whenNotPaused {
+        Proposal storage proposal = proposals[proposalId];
+
+        // Validate proposal status
+        if (proposal.status != ProposalStatus.Active) {
+            revert ProposalNotActive(proposalId, proposal.status);
+        }
+
+        // Validate voting period
+        if (block.number < proposal.startBlock) {
+            revert VotingNotStarted(proposalId, proposal.startBlock);
+        }
+        if (block.number > proposal.endBlock) {
+            revert VotingEnded(proposalId, proposal.endBlock);
+        }
+
+        // Validate vote
+        if (support > 2) revert InvalidVoteType(support);
+
+        VoteReceipt storage receipt = voteReceipts[proposalId][msg.sender];
+        if (receipt.hasVoted) revert AlreadyVoted(msg.sender, proposalId);
+
+        uint256 votes = votingPower[msg.sender];
+        if (votes == 0) revert NoVotingPower(msg.sender);
+
+        // Record vote
+        receipt.hasVoted = true;
+        receipt.support = support;
+        receipt.votes = votes;
+
+        // Tally vote
+        if (support == 0) {
+            proposal.againstVotes += votes;
+        } else if (support == 1) {
+            proposal.forVotes += votes;
+        } else {
+            proposal.abstainVotes += votes;
+        }
+
+        emit VoteCast(msg.sender, proposalId, support, votes, reason);
+    }
+
+    /**
+     * @notice Execute a successful proposal
+     * @param proposalId The ID of the proposal to execute
+     */
+    function executeProposal(uint256 proposalId)
+        external
+        validProposal(proposalId)
+        nonReentrant
+        whenNotPaused
+    {
+        Proposal storage proposal = proposals[proposalId];
+
+        // Validate proposal can be executed
+        if (block.number <= proposal.endBlock) {
+            revert VotingNotStarted(proposalId, proposal.endBlock);
+        }
+
+        if (proposalExecuted[proposalId]) {
+            revert AlreadyExecuted(proposalId);
+        }
+
+        // Calculate results
+        uint256 totalVotes = proposal.forVotes + proposal.againstVotes + proposal.abstainVotes;
+        uint256 quorumVotes = (totalVotingPower * quorumPercentage) / 10000;
+
+        // Check quorum and majority
+        bool quorumReached = totalVotes >= quorumVotes;
+        bool majorityFor = proposal.forVotes > proposal.againstVotes;
+
+        if (!quorumReached || !majorityFor) {
+            proposal.status = ProposalStatus.Defeated;
+            revert ProposalNotSucceeded(proposalId);
+        }
+
+        // Execute
+        proposal.status = ProposalStatus.Executed;
+        proposal.executedAt = block.timestamp;
+        proposalExecuted[proposalId] = true;
+
+        emit ProposalExecuted(proposalId, msg.sender, block.timestamp);
+    }
+
+    /**
+     * @notice Guardian veto power - can veto any active proposal
+     * @param proposalId The ID of the proposal to veto
+     * @param reason Reason for the veto
+     */
+    function vetoProposal(uint256 proposalId, string calldata reason)
+        external
+        validProposal(proposalId)
+        onlyGuardian
+    {
+        Proposal storage proposal = proposals[proposalId];
+
+        if (proposal.status != ProposalStatus.Active &&
+            proposal.status != ProposalStatus.Succeeded) {
+            revert ProposalNotActive(proposalId, proposal.status);
+        }
+
+        proposal.status = ProposalStatus.Vetoed;
+        guardians[msg.sender].vetoCount++;
+
+        emit ProposalVetoed(proposalId, msg.sender, reason);
+    }
+
+    /**
+     * @notice Cancel a proposal (only by proposer, before voting ends)
+     * @param proposalId The ID of the proposal to cancel
+     */
+    function cancelProposal(uint256 proposalId)
+        external
+        validProposal(proposalId)
+    {
+        Proposal storage proposal = proposals[proposalId];
+
+        if (proposal.proposer != msg.sender) revert NotProposer(msg.sender);
+        if (proposal.status != ProposalStatus.Active) {
+            revert ProposalNotActive(proposalId, proposal.status);
+        }
+
+        proposal.status = ProposalStatus.Cancelled;
+
+        emit ProposalCancelled(proposalId, msg.sender);
+    }
+
+    // ============ Admin Functions ============
+
+    /**
+     * @notice Update the EPI threshold
+     * @param newThreshold New threshold value (scaled by 1e6)
+     */
+    function setEPIThreshold(uint256 newThreshold) external onlyOwner {
+        require(newThreshold <= EPI_DECIMALS, "Threshold too high");
+
+        uint256 oldThreshold = epiThreshold;
+        epiThreshold = newThreshold;
+
+        emit EPIThresholdUpdated(oldThreshold, newThreshold);
+    }
+
+    /**
+     * @notice Update the EPI oracle address
+     * @param newOracle New oracle address
+     */
+    function setOracle(address newOracle) external onlyOwner {
+        if (newOracle == address(0)) revert ZeroAddress();
+
+        address oldOracle = address(epiOracle);
+        epiOracle = AggregatorV3Interface(newOracle);
+
+        emit OracleUpdated(oldOracle, newOracle);
+    }
+
+    /**
+     * @notice Update voting period
+     * @param newPeriod New voting period in blocks
+     */
+    function setVotingPeriod(uint256 newPeriod) external onlyOwner {
+        if (newPeriod < MIN_VOTING_PERIOD || newPeriod > MAX_VOTING_PERIOD) {
+            revert InvalidVotingPeriod(newPeriod);
+        }
+        votingPeriod = newPeriod;
+    }
+
+    /**
+     * @notice Add a new guardian
+     * @param guardian Address to add as guardian
+     */
+    function addGuardian(address guardian) external onlyOwner {
+        if (guardian == address(0)) revert ZeroAddress();
+
+        guardians[guardian] = Guardian({
+            isActive: true,
+            vetoCount: 0,
+            addedAt: block.timestamp
+        });
+
+        emit GuardianAdded(guardian);
+    }
+
+    /**
+     * @notice Remove a guardian
+     * @param guardian Address to remove
+     */
+    function removeGuardian(address guardian) external onlyOwner {
+        guardians[guardian].isActive = false;
+        emit GuardianRemoved(guardian);
+    }
+
+    /**
+     * @notice Set voting power for an account
+     * @param account Address to update
+     * @param power New voting power
+     */
+    function setVotingPower(address account, uint256 power) external onlyOwner {
+        if (account == address(0)) revert ZeroAddress();
+
+        uint256 oldPower = votingPower[account];
+        totalVotingPower = totalVotingPower - oldPower + power;
+        votingPower[account] = power;
+
+        emit VotingPowerUpdated(account, oldPower, power);
+    }
+
+    /**
+     * @notice Pause the contract (emergency)
+     */
+    function pause() external onlyGuardian {
+        _pause();
+    }
+
+    /**
+     * @notice Unpause the contract
+     */
+    function unpause() external onlyOwner {
+        _unpause();
+    }
+
+    // ============ View Functions ============
+
+    /**
+     * @notice Get proposal details
+     * @param proposalId The ID of the proposal
+     * @return Proposal struct
+     */
+    function getProposal(uint256 proposalId)
+        external
+        view
+        validProposal(proposalId)
+        returns (Proposal memory)
+    {
+        return proposals[proposalId];
+    }
+
+    /**
+     * @notice Get vote receipt for a voter
+     * @param proposalId The ID of the proposal
+     * @param voter Address of the voter
+     * @return VoteReceipt struct
+     */
+    function getVoteReceipt(uint256 proposalId, address voter)
+        external
+        view
+        returns (VoteReceipt memory)
+    {
+        return voteReceipts[proposalId][voter];
+    }
+
+    /**
+     * @notice Check if an address is a guardian
+     * @param account Address to check
+     * @return bool True if account is an active guardian
+     */
+    function isGuardian(address account) external view returns (bool) {
+        return guardians[account].isActive;
+    }
+
+    /**
+     * @notice Get current EPI from oracle
+     * @return epiScore Current EPI value
+     */
+    function getCurrentEPI() external view returns (uint256 epiScore) {
+        (, int256 epiRaw,,,) = epiOracle.latestRoundData();
+        return uint256(epiRaw);
+    }
+
+    /**
+     * @notice Get proposal state
+     * @param proposalId The ID of the proposal
+     * @return status Current proposal status
+     */
+    function state(uint256 proposalId)
+        external
+        view
+        validProposal(proposalId)
+        returns (ProposalStatus)
+    {
+        Proposal storage proposal = proposals[proposalId];
+
+        if (proposal.status == ProposalStatus.Vetoed ||
+            proposal.status == ProposalStatus.Cancelled ||
+            proposal.status == ProposalStatus.Executed) {
+            return proposal.status;
+        }
+
+        if (block.number <= proposal.endBlock) {
+            return ProposalStatus.Active;
+        }
+
+        // Voting ended - determine outcome
+        uint256 totalVotes = proposal.forVotes + proposal.againstVotes + proposal.abstainVotes;
+        uint256 quorumVotes = (totalVotingPower * quorumPercentage) / 10000;
+
+        if (totalVotes < quorumVotes || proposal.forVotes <= proposal.againstVotes) {
+            return ProposalStatus.Defeated;
+        }
+
+        return ProposalStatus.Succeeded;
     }
 }
-Deployment Script (contracts/ethereum/scripts/deploy.js): Uses Hardhat for testnet (e.g., Sepolia).
-const { ethers } = require("hardhat");
-
-async function main() {
-  const EPIOracle = await ethers.getContractFactory("EPIOracle");  // Stub oracle
-  const oracle = await EPIOracle.deploy();
-  await oracle.waitForDeployment();
-
-  const Governance = await ethers.getContractFactory("MicroAiGovernance");
-  const governance = await Governance.deploy(await oracle.getAddress());
-  await governance.waitForDeployment();
-
-  console.log("Governance deployed to:", await governance.getAddress());
-}
-
-main().catch((error) => {
-  console.error(error);
-  process.exitCode = 1;
-});
-For Solana, contracts/solana/programs/governance/src/lib.rs uses Anchor for proposal logging (high-throughput).
-Deployment Instructions
-	1	Clone & Setup: git clone https://github.com/yourusername/microai-governance-framework.git
-	2	cd microai-governance-framework
-	3	./deploy.sh local  # Installs deps, runs tests
-	4	
-	5	Local Testing:
-	◦	Python: poetry run pytest src/
-	◦	Ethereum: npx hardhat test contracts/ethereum/
-	◦	Solana: anchor test
-	6	Testnet Deploy: ./deploy.sh testnet  # Deploys to Sepolia (ETH) + Devnet (SOL); requires .env with keys
-	7	
-	8	SaaS Overlay (Tier 1):
-	◦	Build API: uvicorn src.api:app (stub FastAPI server for ExecAI).
-	◦	Host: Push to Vercel/Netlify; integrates with cloud EPI computation.
-	9	Scaling to Tiers 2/3:
-	◦	Add GPU support: Integrate Ray in ai_c_suite/ for on-prem inference.
-	◦	Sovereign: Configure air-gapped via Docker Compose (add docker-compose.yml).
-Security Notes: Audit contracts pre-mainnet (e.g., via OpenZeppelin Defender). EPI oracles use multi-sig feeds to prevent manipulation.
-Conclusion and Extensions
-This framework prototypes MicroAi’s vision: a deployable OS for synthetic governance, where ethics is not aspirational but algorithmic. By entangling profit and ethics via EPI, we substantiate the blueprint’s thesis—aligned AI yields superior long-term value. Future work includes LLM integration for full C-Suite (e.g., Llama 3 fine-tuning) and empirical validation against benchmarks like HELM (Stanford, 2023).
-Fork this repo to iterate; contributions welcome for Synthetic Trust certification hooks. For deeper dives, consult the blueprint and cited references.
-References:
-	•	Boyd, S., & Vandenberghe, L. (2004). Convex Optimization. Cambridge University Press.
-	•	Jøsang, A., et al. (2007). A survey of trust and reputation systems. Decision Support Systems, 43(2), 618–644.
-	•	OWASP Foundation. (2023). AI Security and Privacy Guide. 
