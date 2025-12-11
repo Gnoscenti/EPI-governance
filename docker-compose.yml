@@ -1,0 +1,140 @@
+# ============================================================
+# MicroAI Governance Framework - Docker Compose
+# ============================================================
+# Usage:
+#   Development: docker-compose up
+#   Production:  docker-compose -f docker-compose.yml -f docker-compose.prod.yml up
+
+version: '3.8'
+
+services:
+  # Main API service
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: development
+    container_name: microai-governance-api
+    ports:
+      - "${API_PORT:-8000}:8000"
+    volumes:
+      - ./src:/app/src:ro
+      - ./logs:/app/logs
+      - ./examples:/app/examples:ro
+    environment:
+      - API_HOST=0.0.0.0
+      - API_PORT=8000
+      - API_RELOAD=true
+      - EPI_THRESHOLD=${EPI_THRESHOLD:-0.7}
+      - TREASURY_BALANCE=${TREASURY_BALANCE:-5000000}
+      - LOG_DIR=/app/logs
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+    networks:
+      - microai-network
+
+  # Ethereum local node (for development)
+  hardhat:
+    image: node:18-slim
+    container_name: microai-hardhat
+    working_dir: /app/contracts/ethereum
+    command: npx hardhat node
+    ports:
+      - "8545:8545"
+    volumes:
+      - ./contracts/ethereum:/app/contracts/ethereum
+      - ./node_modules:/app/node_modules
+    networks:
+      - microai-network
+    profiles:
+      - blockchain
+
+  # Redis cache (optional)
+  redis:
+    image: redis:7-alpine
+    container_name: microai-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    networks:
+      - microai-network
+    profiles:
+      - cache
+
+  # PostgreSQL database (optional)
+  postgres:
+    image: postgres:15-alpine
+    container_name: microai-postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-microai}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-microai_password}
+      POSTGRES_DB: ${POSTGRES_DB:-microai_governance}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-microai}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - microai-network
+    profiles:
+      - database
+
+  # Prometheus monitoring (optional)
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: microai-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+    networks:
+      - microai-network
+    profiles:
+      - monitoring
+
+  # Grafana dashboard (optional)
+  grafana:
+    image: grafana/grafana:latest
+    container_name: microai-grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:-admin}
+    volumes:
+      - grafana-data:/var/lib/grafana
+    depends_on:
+      - prometheus
+    networks:
+      - microai-network
+    profiles:
+      - monitoring
+
+networks:
+  microai-network:
+    driver: bridge
+
+volumes:
+  redis-data:
+  postgres-data:
+  prometheus-data:
+  grafana-data:
