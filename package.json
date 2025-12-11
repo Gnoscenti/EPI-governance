@@ -1,0 +1,31 @@
+{
+  "name": "microai-governance",
+  "version": "0.1.0",
+  "description": "EPI-based AI Governance Framework",
+  "main": "index.js",
+  "scripts": {
+    "compile": "cd contracts/ethereum && npx hardhat compile",
+    "test": "cd contracts/ethereum && npx hardhat test",
+    "deploy:local": "cd contracts/ethereum && npx hardhat run scripts/deploy.js --network localhost",
+    "deploy:testnet": "cd contracts/ethereum && npx hardhat run scripts/deploy.js --network sepolia"
+  },
+  "keywords": [
+    "ethereum",
+    "solidity",
+    "governance",
+    "ai",
+    "ethics"
+  ],
+  "author": "Gnoscenti",
+  "license": "MIT",
+  "devDependencies": {
+    "@nomicfoundation/hardhat-toolbox": "^4.0.0",
+    "hardhat": "^2.19.0"
+  },
+  "dependencies": {
+    "@chainlink/contracts": "^0.8.0",
+    "@openzeppelin/contracts": "^5.0.0",
+    "ethers": "^6.9.0",
+    "dotenv": "^16.3.0"
+  }
+}

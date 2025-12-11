@@ -1,0 +1,29 @@
+[features]
+seeds = false
+skip-lint = false
+
+[programs.localnet]
+governance = "MicroAiGovernance11111111111111111111111111"
+
+[programs.devnet]
+governance = "MicroAiGovernance11111111111111111111111111"
+
+[programs.mainnet]
+governance = "MicroAiGovernance11111111111111111111111111"
+
+[registry]
+url = "https://api.apr.dev"
+
+[provider]
+cluster = "Localnet"
+wallet = "~/.config/solana/id.json"
+
+[scripts]
+test = "yarn run ts-mocha -p ./tsconfig.json -t 1000000 tests/**/*.ts"
+
+[test]
+startup_wait = 10000
+
+[[test.genesis]]
+address = "MicroAiGovernance11111111111111111111111111"
+program = "target/deploy/governance.so"
