@@ -20,6 +20,7 @@ from src.ai_c_suite.cfo_ai_stub import CFOAIAgent
 
 # ============ EPI Calculator Fixtures ============
 
+
 @pytest.fixture
 def epi_calculator():
     """Create a default EPI calculator."""
@@ -70,6 +71,7 @@ def severe_violation_scores():
 
 # ============ Trust Accumulator Fixtures ============
 
+
 @pytest.fixture
 def trust_accumulator():
     """Create a default trust accumulator."""
@@ -80,6 +82,7 @@ def trust_accumulator():
 def sample_violations():
     """Create sample violation records."""
     import time
+
     base_time = int(time.time())
     return [
         ViolationRecord(0.1, base_time, "Minor compliance issue"),
@@ -89,6 +92,7 @@ def sample_violations():
 
 
 # ============ Policy Validator Fixtures ============
+
 
 @pytest.fixture
 def policy_validator():
@@ -100,11 +104,11 @@ def policy_validator():
 def valid_intent():
     """Create a valid intent that should pass validation."""
     return {
-        'action': 'proposal',
-        'roi_proxy': 0.85,
-        'ethics_factors': {'env': 0.9, 'equity': 0.8, 'fairness': 0.85},
-        'exposure_ratio': 0.2,
-        'past_violations': []
+        "action": "proposal",
+        "roi_proxy": 0.85,
+        "ethics_factors": {"env": 0.9, "equity": 0.8, "fairness": 0.85},
+        "exposure_ratio": 0.2,
+        "past_violations": [],
     }
 
 
@@ -112,11 +116,11 @@ def valid_intent():
 def invalid_intent_low_ethics():
     """Create an intent with low ethics that should fail."""
     return {
-        'action': 'proposal',
-        'roi_proxy': 0.95,
-        'ethics_factors': {'env': 0.3, 'equity': 0.2, 'fairness': 0.25},
-        'exposure_ratio': 0.2,
-        'past_violations': []
+        "action": "proposal",
+        "roi_proxy": 0.95,
+        "ethics_factors": {"env": 0.3, "equity": 0.2, "fairness": 0.25},
+        "exposure_ratio": 0.2,
+        "past_violations": [],
     }
 
 
@@ -124,10 +128,10 @@ def invalid_intent_low_ethics():
 def sanctioned_intent():
     """Create a sanctioned intent that should fail compliance."""
     return {
-        'action': 'transfer',
-        'sanctioned': True,
-        'roi_proxy': 0.85,
-        'ethics_factors': {'env': 0.9, 'equity': 0.8},
+        "action": "transfer",
+        "sanctioned": True,
+        "roi_proxy": 0.85,
+        "ethics_factors": {"env": 0.9, "equity": 0.8},
     }
 
 
@@ -135,15 +139,16 @@ def sanctioned_intent():
 def high_risk_intent():
     """Create a high-risk intent with high exposure."""
     return {
-        'action': 'investment',
-        'roi_proxy': 0.9,
-        'ethics_factors': {'env': 0.8, 'equity': 0.75},
-        'exposure_ratio': 0.9,  # High exposure
-        'past_violations': []
+        "action": "investment",
+        "roi_proxy": 0.9,
+        "ethics_factors": {"env": 0.8, "equity": 0.75},
+        "exposure_ratio": 0.9,  # High exposure
+        "past_violations": [],
     }
 
 
 # ============ Thought Logger Fixtures ============
+
 
 @pytest.fixture
 def thought_logger(tmp_path):
@@ -157,58 +162,45 @@ def thought_logger(tmp_path):
 def sample_thought_data():
     """Create sample thought log data."""
     return {
-        'agent_id': 'CEO-AI',
-        'action': 'strategic_proposal',
-        'reasoning': 'Market analysis indicates growth opportunity in healthcare AI.',
-        'epi_trace': {
-            'epi': 0.82,
-            'hmean': 0.88,
-            'balance_penalty': 0.95,
-            'trust': 1.0,
-            'reason': 'approved'
+        "agent_id": "CEO-AI",
+        "action": "strategic_proposal",
+        "reasoning": "Market analysis indicates growth opportunity in healthcare AI.",
+        "epi_trace": {
+            "epi": 0.82,
+            "hmean": 0.88,
+            "balance_penalty": 0.95,
+            "trust": 1.0,
+            "reason": "approved",
         },
-        'inputs': {
-            'sector': 'healthcare_ai',
-            'investment_amount': 500000
-        },
-        'outputs': {
-            'proposal_id': 'PROP-001',
-            'approved': True
-        }
+        "inputs": {"sector": "healthcare_ai", "investment_amount": 500000},
+        "outputs": {"proposal_id": "PROP-001", "approved": True},
     }
 
 
 # ============ AI C-Suite Fixtures ============
 
+
 @pytest.fixture
 def ceo_agent(tmp_path):
     """Create a CEO-AI agent with temp logging directory."""
-    return CEOAIAgent(
-        agent_id="CEO-AI-TEST",
-        epi_threshold=0.7,
-        risk_tolerance=0.65
-    )
+    return CEOAIAgent(agent_id="CEO-AI-TEST", epi_threshold=0.7, risk_tolerance=0.65)
 
 
 @pytest.fixture
 def cfo_agent(tmp_path):
     """Create a CFO-AI agent."""
-    return CFOAIAgent(
-        agent_id="CFO-AI-TEST",
-        epi_threshold=0.7,
-        treasury_balance=5000000
-    )
+    return CFOAIAgent(agent_id="CFO-AI-TEST", epi_threshold=0.7, treasury_balance=5000000)
 
 
 @pytest.fixture
 def budget_priorities():
     """Create sample budget priorities."""
     return {
-        'r_and_d': 0.35,
-        'marketing': 0.25,
-        'operations': 0.15,
-        'treasury_reserve': 0.15,
-        'team_compensation': 0.10
+        "r_and_d": 0.35,
+        "marketing": 0.25,
+        "operations": 0.15,
+        "treasury_reserve": 0.15,
+        "team_compensation": 0.10,
     }
 
 
@@ -216,14 +208,15 @@ def budget_priorities():
 def quarterly_metrics():
     """Create sample quarterly metrics."""
     return {
-        'revenue': 3200000,
-        'growth_rate': 0.28,
-        'customer_satisfaction': 0.87,
-        'ethics_compliance': 0.85
+        "revenue": 3200000,
+        "growth_rate": 0.28,
+        "customer_satisfaction": 0.87,
+        "ethics_compliance": 0.85,
     }
 
 
 # ============ Test Utilities ============
+
 
 @pytest.fixture
 def temp_log_dir(tmp_path):
@@ -238,9 +231,5 @@ def pytest_configure(config):
     config.addinivalue_line(
         "markers", "slow: marks tests as slow (deselect with '-m \"not slow\"')"
     )
-    config.addinivalue_line(
-        "markers", "integration: marks tests as integration tests"
-    )
-    config.addinivalue_line(
-        "markers", "unit: marks tests as unit tests"
-    )
+    config.addinivalue_line("markers", "integration: marks tests as integration tests")
+    config.addinivalue_line("markers", "unit: marks tests as unit tests")

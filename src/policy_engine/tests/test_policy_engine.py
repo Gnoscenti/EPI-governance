@@ -31,71 +31,68 @@ class TestPolicyValidator:
         """Test that valid intents are approved."""
         result = policy_validator.validate_intent(valid_intent)
 
-        assert result['approved'] is True
-        assert result['reason'] == 'Approved'
-        assert 'epi_trace' in result
-        assert result['epi_trace']['epi'] >= 0.7
+        assert result["approved"] is True
+        assert result["reason"] == "Approved"
+        assert "epi_trace" in result
+        assert result["epi_trace"]["epi"] >= 0.7
 
     def test_low_ethics_rejected(self, policy_validator, invalid_intent_low_ethics):
         """Test that low ethics intents are rejected."""
         result = policy_validator.validate_intent(invalid_intent_low_ethics)
 
-        assert result['approved'] is False
-        assert result['reason'] == 'EPI rejection'
-        assert result['epi_trace']['epi'] < 0.7
+        assert result["approved"] is False
+        assert result["reason"] == "EPI rejection"
+        assert result["epi_trace"]["epi"] < 0.7
 
     def test_sanctioned_intent_rejected(self, policy_validator, sanctioned_intent):
         """Test that sanctioned intents are rejected."""
         result = policy_validator.validate_intent(sanctioned_intent)
 
-        assert result['approved'] is False
-        assert result['reason'] == 'Compliance fail'
+        assert result["approved"] is False
+        assert result["reason"] == "Compliance fail"
 
     def test_high_risk_intent_rejected(self, policy_validator, high_risk_intent):
         """Test that high-risk intents are rejected."""
         result = policy_validator.validate_intent(high_risk_intent)
 
         # High exposure ratio should result in low risk score
-        assert result['risk_score'] < 0.5
-        if result['approved'] is False:
-            assert 'Risk' in result['reason'] or 'EPI' in result['reason']
+        assert result["risk_score"] < 0.5
+        if result["approved"] is False:
+            assert "Risk" in result["reason"] or "EPI" in result["reason"]
 
     def test_intent_with_violations(self, policy_validator):
         """Test intent validation with past violations."""
         intent = {
-            'action': 'proposal',
-            'roi_proxy': 0.85,
-            'ethics_factors': {'env': 0.85, 'equity': 0.8},
-            'past_violations': [0.1, 0.2, 0.15]
+            "action": "proposal",
+            "roi_proxy": 0.85,
+            "ethics_factors": {"env": 0.85, "equity": 0.8},
+            "past_violations": [0.1, 0.2, 0.15],
         }
 
         result = policy_validator.validate_intent(intent)
 
         # Violations should reduce trust and potentially EPI
-        assert 'epi_trace' in result
-        assert result['epi_trace']['trust'] < 1.0
+        assert "epi_trace" in result
+        assert result["epi_trace"]["trust"] < 1.0
 
     def test_empty_ethics_factors(self, policy_validator):
         """Test intent with empty ethics factors."""
         intent = {
-            'action': 'proposal',
-            'roi_proxy': 0.8,
-            'ethics_factors': {},
+            "action": "proposal",
+            "roi_proxy": 0.8,
+            "ethics_factors": {},
         }
 
         # Should handle empty ethics gracefully
         result = policy_validator.validate_intent(intent)
-        assert 'approved' in result
+        assert "approved" in result
 
     def test_missing_fields_defaults(self, policy_validator):
         """Test that missing fields use reasonable defaults."""
-        intent = {
-            'action': 'proposal',
-            'ethics_factors': {'env': 0.8}
-        }
+        intent = {"action": "proposal", "ethics_factors": {"env": 0.8}}
 
         result = policy_validator.validate_intent(intent)
-        assert 'approved' in result
+        assert "approved" in result
 
 
 class TestThoughtLogger:
@@ -110,12 +107,12 @@ class TestThoughtLogger:
     def test_log_thought_returns_hash(self, thought_logger, sample_thought_data):
         """Test that logging a thought returns a valid hash."""
         thought_hash = thought_logger.log_thought(
-            agent_id=sample_thought_data['agent_id'],
-            action=sample_thought_data['action'],
-            reasoning=sample_thought_data['reasoning'],
-            epi_trace=sample_thought_data['epi_trace'],
-            inputs=sample_thought_data['inputs'],
-            outputs=sample_thought_data['outputs']
+            agent_id=sample_thought_data["agent_id"],
+            action=sample_thought_data["action"],
+            reasoning=sample_thought_data["reasoning"],
+            epi_trace=sample_thought_data["epi_trace"],
+            inputs=sample_thought_data["inputs"],
+            outputs=sample_thought_data["outputs"],
         )
 
         assert thought_hash is not None
@@ -126,12 +123,12 @@ class TestThoughtLogger:
         initial_files = list(thought_logger.log_dir.glob("*.json"))
 
         thought_logger.log_thought(
-            agent_id=sample_thought_data['agent_id'],
-            action=sample_thought_data['action'],
-            reasoning=sample_thought_data['reasoning'],
-            epi_trace=sample_thought_data['epi_trace'],
-            inputs=sample_thought_data['inputs'],
-            outputs=sample_thought_data['outputs']
+            agent_id=sample_thought_data["agent_id"],
+            action=sample_thought_data["action"],
+            reasoning=sample_thought_data["reasoning"],
+            epi_trace=sample_thought_data["epi_trace"],
+            inputs=sample_thought_data["inputs"],
+            outputs=sample_thought_data["outputs"],
         )
 
         new_files = list(thought_logger.log_dir.glob("*.json"))
@@ -140,25 +137,25 @@ class TestThoughtLogger:
     def test_log_file_content_valid(self, thought_logger, sample_thought_data):
         """Test that log file contains valid JSON with expected fields."""
         thought_logger.log_thought(
-            agent_id=sample_thought_data['agent_id'],
-            action=sample_thought_data['action'],
-            reasoning=sample_thought_data['reasoning'],
-            epi_trace=sample_thought_data['epi_trace'],
-            inputs=sample_thought_data['inputs'],
-            outputs=sample_thought_data['outputs']
+            agent_id=sample_thought_data["agent_id"],
+            action=sample_thought_data["action"],
+            reasoning=sample_thought_data["reasoning"],
+            epi_trace=sample_thought_data["epi_trace"],
+            inputs=sample_thought_data["inputs"],
+            outputs=sample_thought_data["outputs"],
         )
 
         log_files = list(thought_logger.log_dir.glob("*.json"))
         assert len(log_files) > 0
 
-        with open(log_files[0], 'r') as f:
+        with open(log_files[0], "r") as f:
             data = json.load(f)
 
-        assert data['agent_id'] == sample_thought_data['agent_id']
-        assert data['action'] == sample_thought_data['action']
-        assert data['reasoning'] == sample_thought_data['reasoning']
-        assert 'timestamp' in data
-        assert 'epi_trace' in data
+        assert data["agent_id"] == sample_thought_data["agent_id"]
+        assert data["action"] == sample_thought_data["action"]
+        assert data["reasoning"] == sample_thought_data["reasoning"]
+        assert "timestamp" in data
+        assert "epi_trace" in data
 
     def test_get_thought_history(self, thought_logger, sample_thought_data):
         """Test retrieving thought history."""
@@ -168,9 +165,9 @@ class TestThoughtLogger:
                 agent_id=f"Agent-{i}",
                 action="test_action",
                 reasoning=f"Test reasoning {i}",
-                epi_trace=sample_thought_data['epi_trace'],
-                inputs=sample_thought_data['inputs'],
-                outputs=sample_thought_data['outputs']
+                epi_trace=sample_thought_data["epi_trace"],
+                inputs=sample_thought_data["inputs"],
+                outputs=sample_thought_data["outputs"],
             )
             time.sleep(0.1)  # Ensure different timestamps
 
@@ -184,18 +181,18 @@ class TestThoughtLogger:
             agent_id="CEO-AI",
             action="strategic",
             reasoning="CEO reasoning",
-            epi_trace=sample_thought_data['epi_trace'],
+            epi_trace=sample_thought_data["epi_trace"],
             inputs={},
-            outputs={}
+            outputs={},
         )
 
         thought_logger.log_thought(
             agent_id="CFO-AI",
             action="financial",
             reasoning="CFO reasoning",
-            epi_trace=sample_thought_data['epi_trace'],
+            epi_trace=sample_thought_data["epi_trace"],
             inputs={},
-            outputs={}
+            outputs={},
         )
 
         ceo_history = thought_logger.get_thought_history(agent_id="CEO-AI")
@@ -206,16 +203,16 @@ class TestThoughtLogger:
         import hashlib
 
         thought_logger.log_thought(
-            agent_id=sample_thought_data['agent_id'],
-            action=sample_thought_data['action'],
-            reasoning=sample_thought_data['reasoning'],
-            epi_trace=sample_thought_data['epi_trace'],
-            inputs=sample_thought_data['inputs'],
-            outputs=sample_thought_data['outputs']
+            agent_id=sample_thought_data["agent_id"],
+            action=sample_thought_data["action"],
+            reasoning=sample_thought_data["reasoning"],
+            epi_trace=sample_thought_data["epi_trace"],
+            inputs=sample_thought_data["inputs"],
+            outputs=sample_thought_data["outputs"],
         )
 
         log_files = list(thought_logger.log_dir.glob("*.json"))
-        with open(log_files[0], 'r') as f:
+        with open(log_files[0], "r") as f:
             content = f.read()
 
         computed_hash = hashlib.sha256(content.encode()).hexdigest()
@@ -229,19 +226,19 @@ class TestThoughtLogger:
                 agent_id="TEST-AI",
                 action="test_action",
                 reasoning=f"Test {i}",
-                epi_trace=sample_thought_data['epi_trace'],
+                epi_trace=sample_thought_data["epi_trace"],
                 inputs={},
-                outputs={}
+                outputs={},
             )
 
         report = thought_logger.generate_audit_report()
 
-        assert 'session_id' in report
-        assert 'total_records' in report
-        assert report['total_records'] >= 5
-        assert 'agent_counts' in report
-        assert 'action_counts' in report
-        assert 'epi_statistics' in report
+        assert "session_id" in report
+        assert "total_records" in report
+        assert report["total_records"] >= 5
+        assert "agent_counts" in report
+        assert "action_counts" in report
+        assert "epi_statistics" in report
 
     def test_mock_ipfs_hash(self, thought_logger, sample_thought_data):
         """Test mock IPFS hash generation."""
@@ -249,7 +246,7 @@ class TestThoughtLogger:
         ipfs_hash = thought_logger._push_to_ipfs(content)
 
         # Mock IPFS hash should start with 'Qm'
-        assert ipfs_hash.startswith('Qm')
+        assert ipfs_hash.startswith("Qm")
         assert len(ipfs_hash) == 46  # Standard IPFS CID v0 length
 
 
@@ -265,9 +262,9 @@ class TestIntegration:
             agent_id="POLICY-ENGINE",
             action="intent_validation",
             reasoning=f"Validated intent: {result['reason']}",
-            epi_trace=result['epi_trace'],
+            epi_trace=result["epi_trace"],
             inputs=valid_intent,
-            outputs={'approved': result['approved']}
+            outputs={"approved": result["approved"]},
         )
 
         assert thought_hash is not None
@@ -280,15 +277,11 @@ class TestIntegration:
         """Test complete validation flow from intent to logged decision."""
         # Create intent
         intent = {
-            'action': 'strategic_investment',
-            'roi_proxy': 0.82,
-            'ethics_factors': {
-                'environmental': 0.85,
-                'equity': 0.78,
-                'transparency': 0.9
-            },
-            'exposure_ratio': 0.3,
-            'past_violations': []
+            "action": "strategic_investment",
+            "roi_proxy": 0.82,
+            "ethics_factors": {"environmental": 0.85, "equity": 0.78, "transparency": 0.9},
+            "exposure_ratio": 0.3,
+            "past_violations": [],
         }
 
         # Validate
@@ -299,16 +292,13 @@ class TestIntegration:
             agent_id="GOVERNANCE",
             action="investment_decision",
             reasoning=f"Investment decision: {result['reason']}",
-            epi_trace=result['epi_trace'],
+            epi_trace=result["epi_trace"],
             inputs=intent,
-            outputs={
-                'approved': result['approved'],
-                'risk_score': result['risk_score']
-            }
+            outputs={"approved": result["approved"], "risk_score": result["risk_score"]},
         )
 
         # Generate report
         report = thought_logger.generate_audit_report()
 
-        assert report['total_records'] >= 1
-        assert 'GOVERNANCE' in report['agent_counts']
+        assert report["total_records"] >= 1
+        assert "GOVERNANCE" in report["agent_counts"]

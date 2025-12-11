@@ -25,6 +25,7 @@ from pydantic import BaseModel, Field, validator
 
 # Import EPI modules
 import sys
+
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from src.epi.calculator import EPICalculator, EPIScores
@@ -37,8 +38,10 @@ from src.ai_c_suite.cfo_ai_stub import CFOAIAgent
 
 # ============ Pydantic Models ============
 
+
 class EPIScoreInput(BaseModel):
     """Input for EPI calculation."""
+
     profit: float = Field(..., ge=0.0, le=1.0, description="Profit score (0-1)")
     ethics: float = Field(..., ge=0.0, le=1.0, description="Ethics score (0-1)")
     violations: List[float] = Field(default=[], description="List of violation severities (0-1)")
@@ -50,13 +53,14 @@ class EPIScoreInput(BaseModel):
                 "profit": 0.85,
                 "ethics": 0.78,
                 "violations": [0.1, 0.05],
-                "stakeholder_sentiment": 0.82
+                "stakeholder_sentiment": 0.82,
             }
         }
 
 
 class EPIResponse(BaseModel):
     """Response from EPI calculation."""
+
     epi: float
     valid: bool
     threshold: float
@@ -66,6 +70,7 @@ class EPIResponse(BaseModel):
 
 class IntentInput(BaseModel):
     """Input for policy validation."""
+
     action: str = Field(..., description="Type of action")
     roi_proxy: float = Field(0.5, ge=0.0, le=1.0)
     ethics_factors: Dict[str, float] = Field(default={})
@@ -76,6 +81,7 @@ class IntentInput(BaseModel):
 
 class ValidationResponse(BaseModel):
     """Response from policy validation."""
+
     approved: bool
     reason: str
     epi_trace: Dict[str, Any]
@@ -85,6 +91,7 @@ class ValidationResponse(BaseModel):
 
 class ProposalInput(BaseModel):
     """Input for strategic proposal generation."""
+
     sector: str = Field(..., description="Target sector")
     investment_amount: float = Field(..., gt=0)
     timeline_months: int = Field(18, ge=1, le=60)
@@ -92,6 +99,7 @@ class ProposalInput(BaseModel):
 
 class ProposalResponse(BaseModel):
     """Response for strategic proposal."""
+
     proposal_id: str
     title: str
     approved: bool
@@ -105,19 +113,21 @@ class ProposalResponse(BaseModel):
 
 class BudgetInput(BaseModel):
     """Input for budget allocation."""
+
     total_amount: float = Field(..., gt=0)
     priorities: Dict[str, float] = Field(...)
 
-    @validator('priorities')
+    @validator("priorities")
     def priorities_must_sum_to_one(cls, v):
         total = sum(v.values())
         if abs(total - 1.0) > 0.01:
-            raise ValueError('Priorities must sum to 1.0')
+            raise ValueError("Priorities must sum to 1.0")
         return v
 
 
 class PaymentInput(BaseModel):
     """Input for payment request."""
+
     recipient: str
     amount: float = Field(..., gt=0)
     category: str
@@ -126,6 +136,7 @@ class PaymentInput(BaseModel):
 
 class ThoughtLogInput(BaseModel):
     """Input for thought logging."""
+
     agent_id: str
     action: str
     reasoning: str
@@ -136,6 +147,7 @@ class ThoughtLogInput(BaseModel):
 
 class HealthResponse(BaseModel):
     """API health check response."""
+
     status: str
     version: str
     timestamp: str
@@ -184,7 +196,7 @@ app = FastAPI(
     version="1.0.0",
     lifespan=lifespan,
     docs_url="/docs",
-    redoc_url="/redoc"
+    redoc_url="/redoc",
 )
 
 # CORS configuration
@@ -199,6 +211,7 @@ app.add_middleware(
 
 # ============ Health Endpoints ============
 
+
 @app.get("/health", response_model=HealthResponse, tags=["Health"])
 async def health_check():
     """Check API health status."""
@@ -212,7 +225,7 @@ async def health_check():
             "thought_logger": "ok" if thought_logger else "not_initialized",
             "ceo_agent": "ok" if ceo_agent else "not_initialized",
             "cfo_agent": "ok" if cfo_agent else "not_initialized",
-        }
+        },
     )
 
 
@@ -223,11 +236,12 @@ async def root():
         "name": "MicroAI Governance API",
         "version": "1.0.0",
         "docs": "/docs",
-        "health": "/health"
+        "health": "/health",
     }
 
 
 # ============ EPI Endpoints ============
+
 
 @app.post("/epi/calculate", response_model=EPIResponse, tags=["EPI"])
 async def calculate_epi(scores: EPIScoreInput):
@@ -239,7 +253,7 @@ async def calculate_epi(scores: EPIScoreInput):
         profit=scores.profit,
         ethics=scores.ethics,
         violations=scores.violations,
-        stakeholder_sentiment=scores.stakeholder_sentiment
+        stakeholder_sentiment=scores.stakeholder_sentiment,
     )
 
     include_sentiment = scores.stakeholder_sentiment is not None
@@ -250,7 +264,7 @@ async def calculate_epi(scores: EPIScoreInput):
         valid=valid,
         threshold=epi_calculator.threshold,
         trace=trace,
-        timestamp=datetime.utcnow().isoformat()
+        timestamp=datetime.utcnow().isoformat(),
     )
 
 
@@ -258,22 +272,17 @@ async def calculate_epi(scores: EPIScoreInput):
 async def optimize_epi(
     target_epi: float = Query(..., ge=0.0, le=1.0),
     current_ethics: float = Query(..., ge=0.0, le=1.0),
-    violations: List[float] = Query(default=[])
+    violations: List[float] = Query(default=[]),
 ):
     """Find optimal profit level to achieve target EPI."""
     if not epi_calculator:
         raise HTTPException(status_code=503, detail="EPI calculator not initialized")
 
     result = epi_calculator.optimize_for_golden_ratio(
-        target_epi=target_epi,
-        current_ethics=current_ethics,
-        violations=violations
+        target_epi=target_epi, current_ethics=current_ethics, violations=violations
     )
 
-    return {
-        **result,
-        "timestamp": datetime.utcnow().isoformat()
-    }
+    return {**result, "timestamp": datetime.utcnow().isoformat()}
 
 
 @app.get("/epi/threshold", tags=["EPI"])
@@ -282,13 +291,11 @@ async def get_threshold():
     if not epi_calculator:
         raise HTTPException(status_code=503, detail="EPI calculator not initialized")
 
-    return {
-        "threshold": epi_calculator.threshold,
-        "phi_weight": epi_calculator.phi_weight
-    }
+    return {"threshold": epi_calculator.threshold, "phi_weight": epi_calculator.phi_weight}
 
 
 # ============ Trust Endpoints ============
+
 
 @app.get("/trust/current", tags=["Trust"])
 async def get_current_trust():
@@ -299,7 +306,7 @@ async def get_current_trust():
     return {
         "trust": trust_accumulator.current_trust,
         "violation_count": len(trust_accumulator.violation_history),
-        "timestamp": datetime.utcnow().isoformat()
+        "timestamp": datetime.utcnow().isoformat(),
     }
 
 
@@ -317,7 +324,7 @@ async def record_violation(severity: float = Query(..., ge=0.0, le=1.0), descrip
         "new_trust": trust_accumulator.current_trust,
         "severity": severity,
         "description": description,
-        "timestamp": datetime.utcnow().isoformat()
+        "timestamp": datetime.utcnow().isoformat(),
     }
 
 
@@ -331,18 +338,15 @@ async def get_trust_history(limit: int = Query(10, ge=1, le=100)):
 
     return {
         "violations": [
-            {
-                "severity": v.severity,
-                "timestamp": v.timestamp,
-                "description": v.description
-            }
+            {"severity": v.severity, "timestamp": v.timestamp, "description": v.description}
             for v in history
         ],
-        "count": len(history)
+        "count": len(history),
     }
 
 
 # ============ Policy Endpoints ============
+
 
 @app.post("/policy/validate", response_model=ValidationResponse, tags=["Policy"])
 async def validate_intent(intent: IntentInput, background_tasks: BackgroundTasks):
@@ -359,21 +363,22 @@ async def validate_intent(intent: IntentInput, background_tasks: BackgroundTasks
         agent_id="POLICY-API",
         action="intent_validation",
         reasoning=f"Validated intent: {result['reason']}",
-        epi_trace=result['epi_trace'],
+        epi_trace=result["epi_trace"],
         inputs=intent_dict,
-        outputs={'approved': result['approved']}
+        outputs={"approved": result["approved"]},
     )
 
     return ValidationResponse(
-        approved=result['approved'],
-        reason=result['reason'],
-        epi_trace=result['epi_trace'],
-        risk_score=result.get('risk_score', 0.0),
-        timestamp=datetime.utcnow().isoformat()
+        approved=result["approved"],
+        reason=result["reason"],
+        epi_trace=result["epi_trace"],
+        risk_score=result.get("risk_score", 0.0),
+        timestamp=datetime.utcnow().isoformat(),
     )
 
 
 # ============ AI Agent Endpoints ============
+
 
 @app.post("/agent/ceo/proposal", response_model=ProposalResponse, tags=["AI Agents"])
 async def generate_proposal(proposal_input: ProposalInput):
@@ -384,7 +389,7 @@ async def generate_proposal(proposal_input: ProposalInput):
     proposal = ceo_agent.generate_strategic_proposal(
         sector=proposal_input.sector,
         investment_amount=proposal_input.investment_amount,
-        timeline_months=proposal_input.timeline_months
+        timeline_months=proposal_input.timeline_months,
     )
 
     return ProposalResponse(
@@ -396,7 +401,7 @@ async def generate_proposal(proposal_input: ProposalInput):
         ethics_score=proposal.ethics_score,
         expected_roi=proposal.expected_roi,
         reasoning=proposal.reasoning,
-        timestamp=datetime.utcnow().isoformat()
+        timestamp=datetime.utcnow().isoformat(),
     )
 
 
@@ -416,8 +421,7 @@ async def allocate_budget(budget: BudgetInput):
         raise HTTPException(status_code=503, detail="CFO agent not initialized")
 
     allocation = cfo_agent.allocate_budget(
-        total_amount=budget.total_amount,
-        priorities=budget.priorities
+        total_amount=budget.total_amount, priorities=budget.priorities
     )
 
     return {
@@ -426,7 +430,7 @@ async def allocate_budget(budget: BudgetInput):
         "allocations": allocation.allocations,
         "epi_score": allocation.epi_score,
         "reasoning": allocation.reasoning,
-        "timestamp": datetime.utcnow().isoformat()
+        "timestamp": datetime.utcnow().isoformat(),
     }
 
 
@@ -440,7 +444,7 @@ async def process_payment(payment: PaymentInput):
         recipient=payment.recipient,
         amount=payment.amount,
         category=payment.category,
-        description=payment.description
+        description=payment.description,
     )
 
     return {
@@ -449,7 +453,7 @@ async def process_payment(payment: PaymentInput):
         "amount": result.amount,
         "epi_score": result.epi_score,
         "treasury_balance": cfo_agent.treasury_balance,
-        "timestamp": datetime.utcnow().isoformat()
+        "timestamp": datetime.utcnow().isoformat(),
     }
 
 
@@ -473,6 +477,7 @@ async def get_financial_report():
 
 # ============ Audit Endpoints ============
 
+
 @app.post("/audit/log", tags=["Audit"])
 async def log_thought(thought: ThoughtLogInput):
     """Log an AI thought for audit trail."""
@@ -485,20 +490,14 @@ async def log_thought(thought: ThoughtLogInput):
         reasoning=thought.reasoning,
         epi_trace=thought.epi_trace,
         inputs=thought.inputs,
-        outputs=thought.outputs
+        outputs=thought.outputs,
     )
 
-    return {
-        "thought_hash": thought_hash,
-        "timestamp": datetime.utcnow().isoformat()
-    }
+    return {"thought_hash": thought_hash, "timestamp": datetime.utcnow().isoformat()}
 
 
 @app.get("/audit/history", tags=["Audit"])
-async def get_audit_history(
-    agent_id: Optional[str] = None,
-    limit: int = Query(50, ge=1, le=500)
-):
+async def get_audit_history(agent_id: Optional[str] = None, limit: int = Query(50, ge=1, le=500)):
     """Get thought log history."""
     if not thought_logger:
         raise HTTPException(status_code=503, detail="Thought logger not initialized")
@@ -510,13 +509,13 @@ async def get_audit_history(
             {
                 "agent_id": r.agent_id,
                 "action": r.action,
-                "epi_score": r.epi_trace.get('epi', 0),
+                "epi_score": r.epi_trace.get("epi", 0),
                 "timestamp": r.timestamp,
-                "thought_hash": r.thought_hash
+                "thought_hash": r.thought_hash,
             }
             for r in history
         ],
-        "count": len(history)
+        "count": len(history),
     }
 
 
@@ -540,11 +539,12 @@ async def verify_thought(thought_hash: str, content: str):
     return {
         "valid": is_valid,
         "thought_hash": thought_hash,
-        "timestamp": datetime.utcnow().isoformat()
+        "timestamp": datetime.utcnow().isoformat(),
     }
 
 
 # ============ Error Handlers ============
+
 
 @app.exception_handler(HTTPException)
 async def http_exception_handler(request, exc):
@@ -553,8 +553,8 @@ async def http_exception_handler(request, exc):
         content={
             "error": exc.detail,
             "status_code": exc.status_code,
-            "timestamp": datetime.utcnow().isoformat()
-        }
+            "timestamp": datetime.utcnow().isoformat(),
+        },
     )
 
 
@@ -565,8 +565,8 @@ async def general_exception_handler(request, exc):
         content={
             "error": "Internal server error",
             "detail": str(exc),
-            "timestamp": datetime.utcnow().isoformat()
-        }
+            "timestamp": datetime.utcnow().isoformat(),
+        },
     )
 
 
@@ -574,9 +574,10 @@ async def general_exception_handler(request, exc):
 
 if __name__ == "__main__":
     import uvicorn
+
     uvicorn.run(
         "main:app",
         host=os.getenv("API_HOST", "0.0.0.0"),
         port=int(os.getenv("API_PORT", "8000")),
-        reload=os.getenv("API_RELOAD", "true").lower() == "true"
+        reload=os.getenv("API_RELOAD", "true").lower() == "true",
     )
